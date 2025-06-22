@@ -1,6 +1,6 @@
 public class SingletonLoggerDemo {
 
-    // Inner Logger singleton class
+    
     static class Logger {
         private static Logger singleInstance;
 
