@@ -1,0 +1,68 @@
+CREATE TABLE client_info (
+  client_num    NUMBER PRIMARY KEY,
+  client_age    NUMBER,
+  account_amt   NUMBER,
+  vip_status    VARCHAR2(6),
+  ref_loan_id   NUMBER
+);
+
+CREATE TABLE loan_data (
+  ref_loan_id     NUMBER PRIMARY KEY,
+  borrower_id     NUMBER,
+  rate_of_interest NUMBER(5,2),
+  expiry_date     DATE
+);
+
+INSERT INTO client_info VALUES (201, 68, 15500, 'NO', 501);
+INSERT INTO client_info VALUES (202, 42, 9200,  'NO', 502);
+INSERT INTO loan_data VALUES (501, 201, 8.7, SYSDATE + 12);
+INSERT INTO loan_data VALUES (502, 202, 9.3, SYSDATE + 28);
+COMMIT;
+
+BEGIN
+  FOR rec IN (
+    SELECT client_num, ref_loan_id
+    FROM client_info
+    WHERE client_age > 60
+  )
+  LOOP
+    UPDATE loan_data
+    SET rate_of_interest = rate_of_interest - 1.0
+    WHERE ref_loan_id = rec.ref_loan_id;
+  END LOOP;
+  COMMIT;
+END;
+/
+
+BEGIN
+  FOR vip IN (
+    SELECT client_num
+    FROM client_info
+    WHERE account_amt > 10000
+  )
+  LOOP
+    UPDATE client_info
+    SET vip_status = 'YES'
+    WHERE client_num = vip.client_num;
+  END LOOP;
+  COMMIT;
+END;
+/
+
+BEGIN
+  FOR due IN (
+    SELECT ref_loan_id, borrower_id, expiry_date
+    FROM loan_data
+    WHERE expiry_date BETWEEN SYSDATE AND SYSDATE + 30
+  )
+  LOOP
+    DBMS_OUTPUT.PUT_LINE('Notice: Loan ID ' || due.ref_loan_id ||
+                         ' for Client ' || due.borrower_id ||
+                         ' is expiring on ' || TO_CHAR(due.expiry_date, 'DD-MON-YYYY'));
+  END LOOP;
+END;
+/
+
+SELECT * FROM client_info;
+SELECT * FROM loan_data;
+
