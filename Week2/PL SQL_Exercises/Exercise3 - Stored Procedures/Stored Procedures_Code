@@ -1,0 +1,118 @@
+CREATE TABLE deposit_accounts (
+    acc_id NUMBER PRIMARY KEY,
+    curr_balance NUMBER
+);
+
+CREATE TABLE staff (
+    staff_id NUMBER PRIMARY KEY,
+    staff_name VARCHAR2(50),
+    pay NUMBER,
+    dept_no NUMBER
+);
+
+CREATE TABLE bank_accounts (
+    acc_id NUMBER PRIMARY KEY,
+    curr_balance NUMBER
+);
+
+INSERT INTO deposit_accounts VALUES (11, 1500);
+INSERT INTO deposit_accounts VALUES (12, 2500);
+INSERT INTO staff VALUES (11, 'David', 52000, 1);
+INSERT INTO staff VALUES (12, 'Eva', 61000, 1);
+INSERT INTO staff VALUES (13, 'Frank', 72000, 2);
+INSERT INTO bank_accounts VALUES (201, 6000);
+INSERT INTO bank_accounts VALUES (202, 3500);
+COMMIT;
+
+CREATE OR REPLACE PROCEDURE ApplyMonthlyInterest AS
+BEGIN
+    UPDATE deposit_accounts
+    SET curr_balance = curr_balance + (curr_balance * 0.015); 
+    COMMIT;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE GrantDepartmentBonus (
+    dept_input IN NUMBER,
+    bonus_rate IN NUMBER
+) AS
+BEGIN
+    UPDATE staff
+    SET pay = pay + (pay * bonus_rate / 100)
+    WHERE dept_no = dept_input;
+    COMMIT;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE MoveFunds (
+    src_acc_id IN NUMBER,
+    dest_acc_id IN NUMBER,
+    transfer_amt IN NUMBER
+) AS
+    not_enough_balance EXCEPTION;
+    avail_balance NUMBER;
+BEGIN
+    SELECT curr_balance INTO avail_balance
+    FROM bank_accounts
+    WHERE acc_id = src_acc_id;
+
+    IF avail_balance < transfer_amt THEN
+        RAISE not_enough_balance;
+    END IF;
+
+    UPDATE bank_accounts
+    SET curr_balance = curr_balance - transfer_amt
+    WHERE acc_id = src_acc_id;
+
+    UPDATE bank_accounts
+    SET curr_balance = curr_balance + transfer_amt
+    WHERE acc_id = dest_acc_id;
+
+    COMMIT;
+EXCEPTION
+    WHEN not_enough_balance THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Error: Not enough balance in the account.');
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Unknown error: ' || SQLERRM);
+END;
+/
+
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('** Balance Before Interest Application **');
+    FOR d IN (SELECT * FROM deposit_accounts) LOOP
+        DBMS_OUTPUT.PUT_LINE('Account ' || d.acc_id || ': ' || d.curr_balance);
+    END LOOP;
+
+    ApplyMonthlyInterest;
+
+    DBMS_OUTPUT.PUT_LINE('** Balance After Interest Application **');
+    FOR d IN (SELECT * FROM deposit_accounts) LOOP
+        DBMS_OUTPUT.PUT_LINE('Account ' || d.acc_id || ': ' || d.curr_balance);
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('** Staff Pay Before Bonus Grant **');
+    FOR s IN (SELECT * FROM staff WHERE dept_no = 1) LOOP
+        DBMS_OUTPUT.PUT_LINE(s.staff_name || ': ' || s.pay);
+    END LOOP;
+
+    GrantDepartmentBonus(1, 5); 
+
+    DBMS_OUTPUT.PUT_LINE('** Staff Pay After Bonus Grant **');
+    FOR s IN (SELECT * FROM staff WHERE dept_no = 1) LOOP
+        DBMS_OUTPUT.PUT_LINE(s.staff_name || ': ' || s.pay);
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('** Account Balances Before Fund Move **');
+    FOR b IN (SELECT * FROM bank_accounts) LOOP
+        DBMS_OUTPUT.PUT_LINE('Account ' || b.acc_id || ': ' || b.curr_balance);
+    END LOOP;
+
+    MoveFunds(201, 202, 800);
+    DBMS_OUTPUT.PUT_LINE('** Account Balances After Fund Move **');
+    FOR b IN (SELECT * FROM bank_accounts) LOOP
+        DBMS_OUTPUT.PUT_LINE('Account ' || b.acc_id || ': ' || b.curr_balance);
+    END LOOP;
+END;
+/
